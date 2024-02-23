@@ -1,0 +1,13 @@
+*.pyc
+*.yaml
+*.ckpt
+events.out.*
+*.cpython*
+__pycache__
+*.png
+*.pyc
+utils/__pycache__/enums_model.cpython-310.pyc
+utils/__pycache__/enums.cpython-310.pyc
+lightning_logs*
+dataset-spider-iso
+*.xlsx
