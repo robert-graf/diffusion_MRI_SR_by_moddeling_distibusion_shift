@@ -1,25 +1,10 @@
-import gzip
 import math
-import time
-from math import ceil, floor
 from pathlib import Path
 
 #!pip install numpy
 import numpy as np
 import torch
-from TPTBox import (
-    BIDS_FILE,
-    NII,
-    POI,
-    BIDS_Global_info,
-    Image_Reference,
-    Location,
-    Log_Type,
-    No_Logger,
-    calc_centroids_from_subreg_vert,
-    to_nii,
-)
-from TPTBox.spine.snapshot2D.snapshot_templates import Snapshot_Frame, create_snapshot, mri_snapshot
+from TPTBox import BIDS_FILE, NII, Log_Type, No_Logger
 from tqdm import tqdm
 
 from dataloader.datasets.dataset_superres import target_pad
@@ -46,10 +31,10 @@ def compute_crop_slice(
         raise ValueError("Array would be reduced to zero size")
     c_min = [cor_msk[-2].min(), cor_msk[-1].min()]
     c_max = [cor_msk[-2].max(), cor_msk[-1].max()]
-    x0 = c_min[0] - d[0] if (c_min[0] - d[0]) > 0 else 0
-    y0 = c_min[1] - d[1] if (c_min[1] - d[1]) > 0 else 0
-    x1 = c_max[0] + d[0] if (c_max[0] + d[0]) < shp[-2] else shp[-2]
-    y1 = c_max[1] + d[1] if (c_max[1] + d[1]) < shp[-1] else shp[-1]
+    x0 = max(0, c_min[0] - d[0])
+    y0 = max(0, c_min[1] - d[1])
+    x1 = min(shp[-2], c_max[0] + d[0])
+    y1 = min(shp[-1], c_max[1] + d[1])
     ex_slice = [slice(None), slice(x0, x1 + 1), slice(y0, y1 + 1)]
     if minimum_size is not None:
         if isinstance(minimum_size, int):
@@ -65,7 +50,7 @@ def compute_crop_slice(
                 if new_goal > shp[i]:
                     new_start -= new_goal - shp[i]
                     new_goal = shp[i]
-                if new_start < 0:  #
+                if new_start < 0:
                     new_goal -= new_start
                     new_start = 0
                 ex_slice[i] = slice(new_start, new_goal)
@@ -107,12 +92,12 @@ def upscale_nii(
         arr, pads = target_pad(arr_new, [size[0], size[1], batch_size_])
 
         reversed_pad = tuple(slice(b, -a if a != 0 else None) for a, b in pads)
-
         with torch.no_grad():
             img_lr = torch.from_numpy(arr).permute((2, 1, 0)).unsqueeze_(1).to(device, torch.float32)
             img_lr /= img_lr.max()
             img_lr = img_lr * 2 - 1
             cond = model.encode(img_lr)
+
             noise = torch.stack([rand for _ in range(img_lr.shape[0])], 0).unsqueeze_(1).to(img_lr.device)
             pred2: torch.Tensor = model.render(noise, cond, T=20, palette_condition=[img_lr])
             pred2 = pred2.squeeze_(1).permute((2, 1, 0)).cpu().numpy()[reversed_pad]
@@ -154,7 +139,7 @@ def upscale_nii(
 
                 cond = model_ax.encode(img_lr)
                 noise = torch.stack([rand for _ in range(img_lr.shape[0])], 0).unsqueeze_(1).to(img_lr.device)
-                pred2: torch.Tensor = model_ax.render(noise, cond, T=20, palette_condition=[img_lr])  #
+                pred2: torch.Tensor = model_ax.render(noise, cond, T=20, palette_condition=[img_lr])
                 # IRP -> PIR
                 pred2 = pred2.squeeze_(1).permute((2, 0, 1)).cpu().numpy()[reversed_pad]
                 arr_out[:, i:j, :] = pred2

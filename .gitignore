@@ -11,3 +11,4 @@ utils/__pycache__/enums.cpython-310.pyc
 lightning_logs*
 dataset-spider-iso
 *.xlsx
+*.nii.gz
