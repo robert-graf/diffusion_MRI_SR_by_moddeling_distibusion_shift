@@ -71,11 +71,13 @@ def upscale_nii(
         print(f"{out_path} exist, did nothing")
         return NII.load(out_path, True)
     global model, model_ax  # noqa: PLW0603
+    global default_checkpoint  # noqa: PLW0603
     nii_org = nii_org.copy()
     nii = nii_org.reorient().rescale_((0.8571, 0.8571, 0.8571))
     arr_out = nii.get_array().astype(float)
-    if model is None:
+    if model is None or checkpoint_sag != default_checkpoint:
         model = DAE_LitModel.load_from_checkpoint(checkpoint_sag, strict=False)
+        default_checkpoint = checkpoint_sag
     if model_ax is None and checkpoint_ax is not None:
         model_ax = DAE_LitModel.load_from_checkpoint(checkpoint_ax, strict=False)
     model.to(device)
